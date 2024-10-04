@@ -1,8 +1,12 @@
 import os
 import re
-
+from dotenv import load_dotenv
+#因为过长的文件名会自动截断,本程序的目的是批量重命名从北大法宝上下载下来文件夹中的所有法条 .txt 文件。
+# 每个 .txt 文件的新名称将从文件中的第三行中提取全部的，然后将其与原始文件名中的括号部分组合在一起。
+# 例如，如果文件名为 "file1 (123).txt"，第三行内容为 "New Name"，则文件将重命名为 "New Name (123).txt"。
 # Define the folder path
-folder_path = '/Users/fenghua/Library/CloudStorage/GoogleDrive-fenghua.email@gmail.com/我的云端硬盘/contract_uploaded/'
+load_dotenv()
+folder_path = os.getenv("FOLDER_PATH")
 
 # Traverse the folder and process each .txt file
 for file_name in os.listdir(folder_path):
