@@ -2,7 +2,7 @@ from pypdf import PdfReader, PdfWriter
 import math
 import os
 # 分割 PDF 文件, 按份数或每份页数分割, 并保存到以原文件名命名的文件夹中
-
+# 该程序将提示用户输入要分割的 PDF 文件路径、分割模式和对应的值
 def split_pdf(input_pdf, mode="parts", value=1, output_pdf_prefix=None):
     """
     分割PDF文件并存放在以原文件名命名的文件夹中
