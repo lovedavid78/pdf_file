@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 #因为过长的文件名会自动截断,本程序的目的是批量重命名从北大法宝上下载下来文件夹中的所有法条 .txt 文件。
 # 每个 .txt 文件的新名称将从文件中的第三行中提取全部的，然后将其与原始文件名中的括号部分组合在一起。
 # 例如，如果文件名为 "file1 (123).txt"，第三行内容为 "New Name"，则文件将重命名为 "New Name (123).txt"。
+# 请注意，如果文件名中没有括号部分，则新文件名将只是第三行的内容。
 # Define the folder path
 load_dotenv()
 folder_path = os.getenv("FOLDER_PATH")
