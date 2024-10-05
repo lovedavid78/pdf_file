@@ -1,18 +1,18 @@
 import requests
 
-def check_website(url):
+def check_website(url, timeout=5):
     # Check if the URL starts with 'http://' or 'https://'
     if not url.startswith(('http://', 'https://')):
         url = 'http://' + url
 
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=timeout)
         if response.status_code == 200:
             print(f"Website {url} is accessible.")
         else:
             print(f"Website {url} returned status code: {response.status_code}")
     except requests.exceptions.RequestException as e:
-        print(response.headers)
+        print(f"Failed to access {url}. Error: {e}")
 
 if __name__ == "__main__":
     while True:
