@@ -22,11 +22,10 @@ for file_name in os.listdir(directory):
         audio = WAVE(file_path)
 
         # Check if ID3 tags exist, if not, add them
-        try:
-            tags = audio.tags
-        except error:
+        if audio.tags is None:
             audio.add_tags()
-            tags = audio.tags
+
+        tags = audio.tags
 
         # Add or update artist information
         tags.add(TPE1(encoding=3, text='Adele'))
