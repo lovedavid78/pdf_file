@@ -39,9 +39,9 @@ for file_name in os.listdir(directory):
             album = result['recording-list'][0]['release-list'][0]['title']
             date = result['recording-list'][0]['release-list'][0]['date']
             # Add or update album information
-            tags.add(TALB(encoding=3, text=album))
+            # tags.add(TALB(encoding=3, text=album))
             # Add or update date information
-            tags.add(TDRC(encoding=3, text=date))
+            # tags.add(TDRC(encoding=3, text=date))
 
         # Save changes
         audio.save()
