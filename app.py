@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import datetime
 import os
 from docx import Document
-import PyPDF2
+import pypdf
 
 # 加载 .env 文件中的环境变量
 load_dotenv()
@@ -141,13 +141,10 @@ with gr.Blocks(fill_height=True, theme=gr.themes.Base()) as demo:
     history_display = gr.Textbox(label="历史对话", interactive=False)
     chat_bot = gr.Chatbot(type='messages', line_breaks=True, show_label=False)
 
-    # 创建文件上传组件并设置高度
-    file_input = gr.File(label="上传文件",height=100,)
 
     chat_interface = gr.ChatInterface(
         fn=predict,
         chatbot=chat_bot,
-        additional_inputs=file_input,  # 添加文件上传输入
         type='messages',
         fill_height=True,
     )
