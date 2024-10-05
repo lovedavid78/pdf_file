@@ -6,38 +6,39 @@ import musicbrainzngs
 
 load_dotenv()
 
-# 设置 MusicBrainz 用户代理
+# Set MusicBrainz user agent
 musicbrainzngs.set_useragent("fenghua", "1.0", "99930598@qq.com")
 
-# 打开 WAV 文件
+# Open WAV file
 ads = os.getenv('ICLOUD') + "/600_库/691_音乐/Adele/"
 file_path = ads + "Adele-All I Ask.wav"
 
-# 提取文件名并去掉 'Adele-' 和 '.wav' 部分
+# Extract filename and remove 'Adele-' and '.wav' parts
 file_name = os.path.basename(file_path)
 title = file_name.replace('Adele-', '').replace('.wav', '')
 
-# 加载 WAV 文件
+# Load WAV file
 audio = WAVE(file_path)
 
-# 尝试加载 ID3 标签，如果没有则创建一个新的
+# Try to load ID3 tags, if they already exist, continue
 try:
     audio.add_tags()
-except error:
-    pass
+except error as e:
+    if str(e) != "an ID3 tag already exists":
+        raise
 
-# 添加艺术家信息
+# Add artist information
 audio.tags.add(TPE1(encoding=3, text='Adele'))
 
-# 添加歌曲标题信息
+# Add song title information
 audio.tags.add(TIT2(encoding=3, text=title))
 
-# 查找专辑信息
+# Search for album information
 result = musicbrainzngs.search_recordings(artist="Adele", recording=title, limit=1)
 if result['recording-list']:
     album = result['recording-list'][0]['release-list'][0]['title']
-    # 添加专辑信息
+    # Add album information
     audio.tags.add(TALB(encoding=3, text=album))
 
-# 保存更改
+# Save changes
 audio.save()
