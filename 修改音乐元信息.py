@@ -1,6 +1,6 @@
 import os
 from mutagen.wave import WAVE
-from mutagen.id3 import ID3, TPE1, TIT2, TALB, error
+from mutagen.id3 import ID3, TPE1, TIT2, TALB, TDRC, error
 from dotenv import load_dotenv
 import musicbrainzngs
 
@@ -9,36 +9,40 @@ load_dotenv()
 # Set MusicBrainz user agent
 musicbrainzngs.set_useragent("fenghua", "1.0", "99930598@qq.com")
 
-# Open WAV file
-ads = os.getenv('ICLOUD') + "/600_库/691_音乐/Adele/"
-file_path = ads + "Adele-All I Ask.wav"
+# Directory containing WAV files
+directory = os.getenv('ICLOUD') + "/600_库/691_音乐/Adele/"
 
-# Extract filename and remove 'Adele-' and '.wav' parts
-file_name = os.path.basename(file_path)
-title = file_name.replace('Adele-', '').replace('.wav', '')
+# Iterate over all files in the directory
+for file_name in os.listdir(directory):
+    if file_name.endswith('.wav'):
+        file_path = os.path.join(directory, file_name)
+        title = file_name.replace('Adele-', '').replace('.wav', '')
 
-# Load WAV file
-audio = WAVE(file_path)
+        # Load WAV file
+        audio = WAVE(file_path)
 
-# Try to load ID3 tags, if they already exist, continue
-try:
-    audio.add_tags()
-except error as e:
-    if str(e) != "an ID3 tag already exists":
-        raise
+        # Check if ID3 tags exist, if not, add them
+        try:
+            tags = audio.tags
+        except error:
+            audio.add_tags()
+            tags = audio.tags
 
-# Add artist information
-audio.tags.add(TPE1(encoding=3, text='Adele'))
+        # Add or update artist information
+        tags.add(TPE1(encoding=3, text='Adele'))
 
-# Add song title information
-audio.tags.add(TIT2(encoding=3, text=title))
+        # Add or update song title information
+        tags.add(TIT2(encoding=3, text=title))
 
-# Search for album information
-result = musicbrainzngs.search_recordings(artist="Adele", recording=title, limit=1)
-if result['recording-list']:
-    album = result['recording-list'][0]['release-list'][0]['title']
-    # Add album information
-    audio.tags.add(TALB(encoding=3, text=album))
+        # Search for album information
+        result = musicbrainzngs.search_recordings(artist="Adele", recording=title, limit=1)
+        if result['recording-list']:
+            album = result['recording-list'][0]['release-list'][0]['title']
+            date = result['recording-list'][0]['release-list'][0]['date']
+            # Add or update album information
+            tags.add(TALB(encoding=3, text=album))
+            # Add or update date information
+            tags.add(TDRC(encoding=3, text=date))
 
-# Save changes
-audio.save()
+        # Save changes
+        audio.save()
