@@ -8,15 +8,9 @@ def check_website(url, timeout=5):
     try:
         response = requests.get(url, timeout=timeout)
         if response.status_code == 200:
-            print(f"Website {url} is accessible.")
-        else:
-            print(f"Website {url} returned status code: {response.status_code}")
+            return 'ok'
     except requests.exceptions.RequestException as e:
-        print(f"Failed to access {url}. Error: {e}")
+        return '403'
 
 if __name__ == "__main__":
-    while True:
-        url = input("Enter the URL of the website to check (or type 'exit' to quit): ")
-        if url.lower() == 'exit':
-            break
-        check_website(url)
+    check_website(url)
