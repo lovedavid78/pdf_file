@@ -1,10 +1,13 @@
 /.env
 /chrome-mac-arm64/
 /.venv/
-/users.csv
+
 /feng_history.csv
 /1.py
 /343.txt
 /test.py
 /.idea/
 .DS_Store
+pytest.ini
+__init__.py
+.gitignore

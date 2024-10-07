@@ -116,7 +116,7 @@ def predict(message, history, file=None):
 
     save_history_to_file(username, "用户", user_message)
 
-    # 确保历史记录格式为包含 'role' 和 'content' 的字典
+    #
     history_openai_format = [{"role": h["role"], "content": h["content"]} for h in history]
     history_openai_format.append({"role": "user", "content": user_message})
 
@@ -156,6 +156,8 @@ with gr.Blocks(fill_height=True, theme=gr.themes.Base()) as demo:
         chatbot=chat_bot,
         type='messages',
         fill_height=True,
+        multimodal=True,
+
     )
 
     # 按钮点击后显示历史对话
