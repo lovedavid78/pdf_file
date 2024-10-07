@@ -7,6 +7,16 @@ import os
 from docx import Document
 import pypdf
 
+
+
+def test_user_authentication():
+    users_df = load_users()
+    assert validate_user("test_user", "test_password", users_df) == False
+    # 使用 concat 替代 append
+    new_user = pd.DataFrame({"username": ["test_user"], "password": ["test_password"]})
+    users_df = pd.concat([users_df, new_user], ignore_index=True)
+    assert validate_user("test_user", "test_password", users_df) == True
+
 # 加载 .env 文件中的环境变量
 load_dotenv()
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
