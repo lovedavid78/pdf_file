@@ -51,7 +51,7 @@ def process_file(file):
         elif file_extension == 'pdf':
             # 处理 pdf 文件
             with open(file.name, 'rb') as f:
-                reader = PyPDF2.PdfReader(f)
+                reader = pypdf.PdfReader(f)
                 for page_num in range(len(reader.pages)):
                     file_content += reader.pages[page_num].extract_text()
 
@@ -100,7 +100,6 @@ def predict(message, history, file=None):
     # 如果有上传文件，读取文件内容并附加到消息中
     if file:
         file_content = process_file(file)  # 获取文件内容
-        file_input.clear()  # 清空文件输入
         user_message = f"文档内容: {file_content}\n\n{message}"
     else:
         user_message = message

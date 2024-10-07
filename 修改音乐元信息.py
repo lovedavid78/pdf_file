@@ -34,14 +34,17 @@ for file_name in os.listdir(directory):
         tags.add(TIT2(encoding=3, text=title))
 
         # Search for album information
-        result = musicbrainzngs.search_recordings(artist="Adele", recording=title, limit=1)
-        if result['recording-list']:
-            album = result['recording-list'][0]['release-list'][0]['title']
-            date = result['recording-list'][0]['release-list'][0]['date']
-            # Add or update album information
-            # tags.add(TALB(encoding=3, text=album))
-            # Add or update date information
-            # tags.add(TDRC(encoding=3, text=date))
+        # result = musicbrainzngs.search_recordings(artist="Adele", recording=title, limit=1)
+        # if result['recording-list']:
+        #     album = result['recording-list'][0]['release-list'][0]['title']
+        #     date = result['recording-list'][0]['release-list'][0]['date']
+        #     # Add or update album information
+        #     tags.add(TALB(encoding=3, text=album))
+        #     # Add or update date information
+        #     tags.add(TDRC(encoding=3, text=date))
 
         # Save changes
         audio.save()
+
+        # Print the updated tags
+        print(f"更新了文件 {file_name}:"),tags.values()
