@@ -1,3 +1,9 @@
+# @文档 https://www.gradio.app/docs/
+# @gradio python   API参考 https://www.gradio.app/docs/python-client
+# @gradio API参考 https://www.gradio.app/docs
+# @openai API参考 https://platform.openai.com/docs/api-reference/introduction
+
+
 import openai
 import gradio as gr
 import pandas as pd
@@ -107,16 +113,16 @@ def load_history_from_file(username):
 def predict(message, history, file=None):
     username = username_state.value
 
-    # 如果有上传文件，读取文件内容并附加到消息中
+    # 处理文件上传
     if file:
-        file_content = process_file(file)  # 获取文件内容
+        file_content = process_file(file)
         user_message = f"文档内容: {file_content}\n\n{message}"
     else:
         user_message = message
 
     save_history_to_file(username, "用户", user_message)
 
-    #
+    # OpenAI API调用部分保持不变
     history_openai_format = [{"role": h["role"], "content": h["content"]} for h in history]
     history_openai_format.append({"role": "user", "content": user_message})
 
@@ -135,7 +141,7 @@ def predict(message, history, file=None):
             yield partial_message
 
     save_history_to_file(username, "模型", partial_message)
-
+    return partial_message
 
 # 验证用户登录
 def custom_auth(username, password):
@@ -143,32 +149,26 @@ def custom_auth(username, password):
 
 
 # 创建 Gradio 界面
-with gr.Blocks(fill_height=True, theme=gr.themes.Base()) as demo:
+with gr.Blocks(theme=gr.themes.Base()) as demo:
     gr.Markdown("## 冯律师法律服务团队专属GPT")
 
     # 显示历史对话
     history_display = gr.Textbox(label="历史对话", interactive=False)
-    chat_bot = gr.Chatbot(type='messages', line_breaks=True, show_label=False)
-
 
     chat_interface = gr.ChatInterface(
         fn=predict,
-        chatbot=chat_bot,
-        type='messages',
-        fill_height=True,
-        multimodal=True,
-
+        additional_inputs=[gr.File(label="上传文件")],
+        title="聊天界面",
     )
 
     # 按钮点击后显示历史对话
     history_button = gr.Button("显示历史对话")
-
     history_button.click(fn=lambda: load_history_from_file(username_state.value), outputs=history_display)
 
-# 启动 Gradio 应用，添加用户认证功能
-# demo.launch(auth=custom_auth)
-demo.launch()
+ 
 
+# 启动 Gradio 应用，添加用户认证功能
+demo.launch(auth=custom_auth)
 
 
 
