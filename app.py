@@ -3,7 +3,6 @@
 # @gradio API参考 https://www.gradio.app/docs
 # @openai API参考 https://platform.openai.com/docs/api-reference/introduction
 
-
 import openai
 import gradio as gr
 from dotenv import load_dotenv
@@ -12,57 +11,23 @@ import os
 from docx import Document
 import pypdf
 import sqlite3
+from assistant_manager import get_assistants
 
-
-def test_user_authentication():
-    init_db()
-    add_user("test_user", "test_password")
-    assert validate_user("test_user", "test_password") == True
-    assert validate_user("fake_user", "fake_password") == False
 
 # 加载 .env 文件中的环境变量
 load_dotenv()
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-username_state = gr.State()
 MAX_TOKENS = 32000  # GPT-4 的最大 token 限制
 MAX_FILE_CONTENT_TOKENS = 8000  # 限制文件内容的 token 数量
 
-
-# 初始化数据库
-def init_db():
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (username TEXT PRIMARY KEY, password TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS chat_history
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  username TEXT,
-                  timestamp TEXT,
-                  role TEXT,
-                  content TEXT)''')
-    conn.commit()
-    conn.close()
-
-# 添加用户
-def add_user(username, password):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO users VALUES (?, ?)", (username, password))
-    conn.commit()
-    conn.close()
-
-# 用户验证函数，并将用户名存储到 State
+# 用户验证函数
 def validate_user(username, password):
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
     result = c.fetchone()
     conn.close()
-    if result:
-        username_state.value = username
-        return True
-    return False
-
+    return result is not None
 
 # 处理文件上传
 def process_file(file):
@@ -81,7 +46,7 @@ def process_file(file):
             file_content = "\n".join([para.text for para in doc.paragraphs])
 
         elif file_extension == 'pdf':
-            # 处理 pdf 文件
+            # 理 pdf 文件
             with open(file.name, 'rb') as f:
                 reader = pypdf.PdfReader(f)
                 for page_num in range(len(reader.pages)):
@@ -96,11 +61,10 @@ def process_file(file):
 
     return ""
 
-
 # 将对话历史保存到数据库中
 def save_history_to_db(username, role, content):
     if username:
-        conn = sqlite3.connect('users.db')
+        conn = sqlite3.connect('chat_history.db')
         c = conn.cursor()
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         c.execute("INSERT INTO chat_history (username, timestamp, role, content) VALUES (?, ?, ?, ?)",
@@ -112,8 +76,8 @@ def save_history_to_db(username, role, content):
 
 # 从数据库中读取历史对话
 def load_history_from_db(username):
-    if username:
-        conn = sqlite3.connect('users.db')
+    if username and username != "未登录":
+        conn = sqlite3.connect('chat_history.db')
         c = conn.cursor()
         c.execute("SELECT timestamp, role, content FROM chat_history WHERE username=? ORDER BY timestamp", (username,))
         rows = c.fetchall()
@@ -124,9 +88,16 @@ def load_history_from_db(username):
     return "无历史对话。"
 
 # 调用 OpenAI 模型进行聊天对话
-def predict(message, history, file=None, username=None):
-    if username is None:
-        username = username_state.value
+def predict(message, history, assistant_name, file=None):
+    username = gr.State().value
+    if not username:
+        return "错误：用户名为空，请确保您已正确登录。"
+
+    # 获取助手ID
+    assistants = get_assistants()
+    assistant_id = assistants.get(assistant_name)
+    if not assistant_id:
+        return f"错误：找不到名为 '{assistant_name}' 的助手。"
 
     # 处理文件上传
     if file:
@@ -137,51 +108,99 @@ def predict(message, history, file=None, username=None):
 
     save_history_to_db(username, "用户", user_message)
 
-    # OpenAI API调用部分保持不变
-    history_openai_format = [{"role": h["role"], "content": h["content"]} for h in history]
+    # 修改这里的历处理逻辑
+    history_openai_format = []
+    for h in history:
+        if isinstance(h, dict) and "role" in h and "content" in h:
+            history_openai_format.append({"role": h["role"], "content": h["content"]})
+        elif isinstance(h, list) and len(h) == 2:
+            history_openai_format.append({"role": "user" if h[0] else "assistant", "content": h[1]})
+
     history_openai_format.append({"role": "user", "content": user_message})
 
-    # 调用OpenAI API
-    response = client.chat.completions.create(
-        model='gpt-4o',
-        messages=history_openai_format,
-        temperature=1.0,
-        stream=True
+    # 使用选定的助手创建新的线程和消息
+    thread = client.beta.threads.create()
+    client.beta.threads.messages.create(
+        thread_id=thread.id,
+        role="user",
+        content=user_message
     )
 
-    partial_message = ""
-    for chunk in response:
-        if chunk.choices[0].delta.content is not None:
-            partial_message += chunk.choices[0].delta.content
-            yield partial_message
+    # 运行助手
+    try:
+        run = client.beta.threads.runs.create(
+            thread_id=thread.id,
+            assistant_id=assistant_id
+        )
 
-    save_history_to_db(username, "模型", partial_message)
-    return partial_message
+        # 等待运行完成
+        while run.status != "completed":
+            run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
 
-# 验证用户登录
-def custom_auth(username, password):
-    return validate_user(username, password)
+        # 获取助手的回复
+        messages = client.beta.threads.messages.list(thread_id=thread.id)
+        assistant_message = next((m for m in messages if m.role == "assistant"), None)
 
-# 在主程序开始时初始化数据库
-init_db()
+        if assistant_message:
+            response_content = assistant_message.content[0].text.value
+            save_history_to_db(username, "模型", response_content)
+            return response_content
+        else:
+            return "助手没有生成回复。"
+    except Exception as e:
+        return f"发生错误：{str(e)}"
 
 # 创建 Gradio 界面
 def create_chat_interface():
-    history_display = gr.Textbox(label="历史对话", interactive=False)
-    chat_interface = gr.ChatInterface(
-        fn=predict,
-        additional_inputs=[gr.File(label="上传文件")],
-        title="聊天界面",
+    assistants = get_assistants()
+    assistant_choices = list(assistants.keys())
+    
+    with gr.Blocks() as chat_interface:
+        with gr.Row():
+            with gr.Column(scale=1, min_width=100):
+                with gr.Accordion("历史对话", open=False):
+                    history_display = gr.Textbox(label="历史对话", interactive=False, lines=20)
+                    history_button = gr.Button("刷新历史对话")
+                with gr.Accordion("上传文件", open=True):
+                    file_upload = gr.File(label="上传文件", elem_id="file_upload")
+                with gr.Accordion("选择助手", open=True):
+                    assistant_dropdown = gr.Dropdown(choices=assistant_choices, label="选择助手", value=assistant_choices[0] if assistant_choices else None)
+            with gr.Column(scale=3, min_width=400):
+                chatbot = gr.Chatbot(height=400)
+                msg = gr.Textbox(label="输入消息")
+                send_btn = gr.Button("发送")
+        
+        username_state = gr.State("")
+    
+    def user(user_message, history, assistant_name, file):
+        return "", history + [[user_message, None]]
+    
+    def bot(history, assistant_name, file):
+        user_message = history[-1][0]
+        bot_message = predict(user_message, history[:-1], assistant_name, file)
+        history[-1][1] = bot_message
+        return history
+    
+    msg.submit(user, [msg, chatbot, assistant_dropdown, file_upload], [msg, chatbot]).then(
+        bot, [chatbot, assistant_dropdown, file_upload], chatbot
     )
-    history_button = gr.Button("显示历史对话")
-    return history_display, chat_interface, history_button
+    send_btn.click(user, [msg, chatbot, assistant_dropdown, file_upload], [msg, chatbot]).then(
+        bot, [chatbot, assistant_dropdown, file_upload], chatbot
+    )
+    
+    def update_history():
+        username = gr.State().value
+        return load_history_from_db(username)
+    
+    history_button.click(fn=update_history, outputs=history_display)
+    
+    return chat_interface, history_display, history_button, assistant_dropdown, username_state
 
-# 启动 Gradio 应用，添加用户认证功能
-# demo.launch(auth=custom_auth)
-
-# 如果你想在单独运行app.py时启动应用，可以添加以下代码：
+# 主程序部分
 if __name__ == "__main__":
     with gr.Blocks() as demo:
-        history_display, chat_interface, history_button = create_chat_interface()
-        history_button.click(fn=lambda: load_history_from_db(username_state.value), outputs=history_display)
-    demo.launch(auth=custom_auth)
+        chat_interface, history_display, history_button, assistant_dropdown, username_state = create_chat_interface()
+        
+        demo.load(fn=lambda: load_history_from_db(gr.State().value), outputs=history_display)
+    
+    demo.launch(auth=validate_user, auth_message="请登录以访问聊天界面")
