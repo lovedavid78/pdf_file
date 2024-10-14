@@ -11,3 +11,6 @@
 pytest.ini
 __init__.py
 .gitignore
+assistants.db
+user.py
+users.db
