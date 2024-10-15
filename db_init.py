@@ -3,8 +3,22 @@ import sqlite3
 def init_users_db():
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
+    
+    # 检查 total_tokens 列是否存在
+    c.execute("PRAGMA table_info(users)")
+    columns = [column[1] for column in c.fetchall()]
+    
+    if 'total_tokens' not in columns:
+        # 如果 total_tokens 列不存在，添加它
+        c.execute("ALTER TABLE users ADD COLUMN total_tokens INTEGER DEFAULT 0")
+        print("Added total_tokens column to users table")
+    
+    # 创建用户表（如果不存在）
     c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (username TEXT PRIMARY KEY, password TEXT)''')
+                 (username TEXT PRIMARY KEY,
+                  password TEXT,
+                  total_tokens INTEGER DEFAULT 0)''')
+    
     conn.commit()
     conn.close()
 

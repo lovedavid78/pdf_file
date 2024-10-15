@@ -293,54 +293,88 @@ def upload_file_to_vector_store(file, assistant_id):
 
 # 在 create_assistant_manager_interface 函数中更新相关部分
 def create_assistant_manager_interface():
-    assistants = gr.State(get_assistants())
-    available_models = gr.State(get_available_models())
-    vector_stores = gr.State(get_all_vector_stores())
+    assistants = gr.State(get_assistants)
+    available_models = gr.State(get_available_models)
+    vector_stores = gr.State(get_all_vector_stores)
 
     with gr.Tab("创建Assistant"):
         with gr.Row():
             with gr.Column(scale=2):
                 name_input = gr.Textbox(label="Assistant名称")
                 instructions_input = gr.Textbox(label="指令", lines=5)
-                model_input = gr.Dropdown(label="模型", choices=lambda: available_models.value)
-                vector_store_dropdown = gr.Dropdown(label="选择Vector Store", choices=lambda: [vs[0] for vs in vector_stores.value if vs[0]])
+                model_input = gr.Dropdown(choices=available_models.value, label="模型")
+                vector_store_dropdown = gr.Dropdown(choices=[vs[0] for vs in vector_stores.value if vs[0]], label="选择Vector Store")
                 create_button = gr.Button("创建Assistant")
             
             with gr.Column(scale=1):
                 vector_store_name_input = gr.Textbox(label="新Vector Store名称")
                 create_vector_store_button = gr.Button("创建Vector Store")
+                
+        
+        def create_assistant_with_info(name, instructions, model, vector_store_name):
+            vector_store_id = next((vs[1] for vs in vector_stores.value if vs[0] == vector_store_name), None)
+            if vector_store_id is None:
+                return gr.Info("无效的Vector Store名称")
+            result = create_assistant(name, instructions, model, vector_store_id)
+            return gr.Info(result)
+        
+        def create_vector_store(name):
+            try:
+                new_vector_store = client.beta.vector_stores.create(name=name)
+                vector_stores.value = get_all_vector_stores()
+                return f"Vector Store创建成功: {new_vector_store.name}", gr.update(choices=[vs[0] for vs in vector_stores.value if vs[0]], value=new_vector_store.name)
+            except Exception as e:
+                return f"Vector Store创建失败: {str(e)}", gr.update(choices=[vs[0] for vs in vector_stores.value if vs[0]])
         
         create_button.click(
             create_assistant_with_info,
             inputs=[name_input, instructions_input, model_input, vector_store_dropdown],
-            outputs=gr.Info()
         )
         
         create_vector_store_button.click(
             create_vector_store,
             inputs=[vector_store_name_input],
-            outputs=[gr.Info(), vector_store_dropdown]
+            outputs=[gr.Textbox(visible=False), vector_store_dropdown]
         )
 
     with gr.Tab("更新Assistant"):
         with gr.Row():
-            assistant_dropdown = gr.Dropdown(label="选择助手", choices=lambda: list(assistants.value.keys()))
-            update_model_input = gr.Dropdown(label="选择模型", choices=lambda: available_models.value)
-            vector_store_dropdown = gr.Dropdown(label="选择存储", choices=lambda: vector_stores.value)
+            assistant_dropdown = gr.Dropdown(choices=list(assistants.value.keys()), label="选择助手")
+            update_model_input = gr.Dropdown(choices=available_models.value, label="选择模型", scale=1)
+            vector_store_dropdown = gr.Dropdown(choices=vector_stores.value, label="选择存储", scale=1)
         update_instructions_input = gr.Textbox(label="新指令", lines=5)
         update_button = gr.Button("更新Assistant")
         vector_stores_and_files_list = gr.JSON(label="关联的向量存储和文件")
 
+        def load_assistant_info(assistant_name):
+            if assistant_name is None:
+                return "", "", "", []
+            assistant_id = assistants.value.get(assistant_name)
+            if assistant_id is None:
+                return "", "", "", []
+            assistant = client.beta.assistants.retrieve(assistant_id)
+            vector_stores_and_files = get_assistant_vector_stores_and_files(assistant_id)
+            current_vector_store = assistant.tool_resources.file_search.vector_store_ids[0] if assistant.tool_resources and assistant.tool_resources.file_search else None
+            return assistant.instructions, assistant.model, current_vector_store, vector_stores_and_files
+        
         assistant_dropdown.change(
             load_assistant_info,
             inputs=[assistant_dropdown],
             outputs=[update_instructions_input, update_model_input, vector_store_dropdown, vector_stores_and_files_list]
         )
         
+        def update_assistant_wrapper(assistant_name, instructions, model, vector_store_id):
+            if assistant_name is None:
+                return gr.Info("请选择一个Assistant")
+            assistant_id = assistants.value.get(assistant_name)
+            if assistant_id is None:
+                return gr.Info(f"无法找到名为 {assistant_name} 的Assistant")
+            result = update_assistant(assistant_id, instructions, model, vector_store_id)
+            return gr.Info(result)
+        
         update_button.click(
             update_assistant_wrapper,
             inputs=[assistant_dropdown, update_instructions_input, update_model_input, vector_store_dropdown],
-            outputs=gr.Info()
         )
 
     # 修改列出Assistants的标签页
@@ -375,7 +409,7 @@ def create_assistant_manager_interface():
         )
 
     with gr.Tab("上传文件到Assistant"):
-        assistant_dropdown = gr.Dropdown(label="选择Assistant", choices=lambda: list(assistants.value.keys()))
+        assistant_dropdown = gr.Dropdown(choices=list(assistants.value.keys()), label="选择Assistant")
         file_upload = gr.File(label="选择文件")
         upload_button = gr.Button("上传文件")
 
